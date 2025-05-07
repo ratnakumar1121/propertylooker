@@ -18,7 +18,7 @@ function Home() {
 
   const fetchProperties = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/properties');
+      const response = await axios.get('/api/properties');
       setProperties(response.data);
     } catch (error) {
       console.error('Error fetching properties:', error);
@@ -28,7 +28,7 @@ function Home() {
   const handleSearch = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.get('http://localhost:5000/api/properties/search', {
+      const response = await axios.get('/api/properties/search', {
         params: searchParams
       });
       setProperties(response.data);

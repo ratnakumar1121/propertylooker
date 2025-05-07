@@ -30,7 +30,7 @@ function AdminDashboard() {
 
   const fetchProperties = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/properties', {
+      const response = await axios.get('/api/properties', {
         headers: { 'x-auth-token': localStorage.getItem('token') }
       });
       setProperties(response.data);
@@ -89,11 +89,11 @@ function AdminDashboard() {
     e.preventDefault();
     try {
       if (editingId) {
-        await axios.put(`http://localhost:5000/api/properties/${editingId}`, newProperty, {
+        await axios.put(`/api/properties/${editingId}`, newProperty, {
           headers: { 'x-auth-token': localStorage.getItem('token') }
         });
       } else {
-        await axios.post('http://localhost:5000/api/properties', newProperty, {
+        await axios.post('/api/properties', newProperty, {
           headers: { 'x-auth-token': localStorage.getItem('token') }
         });
       }
@@ -116,7 +116,7 @@ function AdminDashboard() {
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`http://localhost:5000/api/properties/${id}`, {
+      await axios.delete(`/api/properties/${id}`, {
         headers: { 'x-auth-token': localStorage.getItem('token') }
       });
       fetchProperties();
