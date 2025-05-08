@@ -173,7 +173,7 @@ function Home() {
                 <p className="price">₹{property.price.toLocaleString()}</p>
                 <p className="location">{property.location}</p>
                 <p className="details">
-                  Area: {property.area} sq ft | Facing: {property.facing}
+                  Area: {property.area} sq yd | Facing: {property.facing}
                 </p>
                 <p className="description">{property.description}</p>
                 <div className="features">

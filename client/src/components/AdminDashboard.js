@@ -196,7 +196,7 @@ function AdminDashboard() {
             />
           </div>
           <div className="form-group">
-            <label>Area (sq ft)</label>
+            <label>Area (sq yd)</label>
             <input
               type="number"
               name="area"
@@ -287,6 +287,7 @@ function AdminDashboard() {
                 <h4>{property.title}</h4>
                 <p>₹{property.price.toLocaleString()}</p>
                 <p>{property.location}</p>
+                <p>Area: {property.area} sq yd | Facing: {property.facing}</p>
                 <button
                   onClick={() => handleDelete(property._id)}
                   className="delete-button"
