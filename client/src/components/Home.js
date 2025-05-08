@@ -166,6 +166,9 @@ function Home() {
                 </div>
               )}
               <div className="property-info">
+                <div style={{ fontWeight: 'bold', color: '#888', fontSize: '0.95em', marginBottom: 4 }}>
+                  ID: {property.propertyId}
+                </div>
                 <h3>{property.title}</h3>
                 <p className="price">₹{property.price.toLocaleString()}</p>
                 <p className="location">{property.location}</p>

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const AutoIncrement = require('mongoose-sequence')(mongoose);
 
 const PropertySchema = new mongoose.Schema({
     title: {
@@ -36,7 +37,13 @@ const PropertySchema = new mongoose.Schema({
     createdAt: {
         type: Date,
         default: Date.now
+    },
+    propertyId: {
+        type: Number,
+        unique: true
     }
 });
+
+PropertySchema.plugin(AutoIncrement, { inc_field: 'propertyId' });
 
 module.exports = mongoose.model('Property', PropertySchema); 

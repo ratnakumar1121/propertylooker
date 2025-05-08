@@ -281,6 +281,9 @@ function AdminDashboard() {
             <div key={property._id} className="property-card">
               <img src={property.imageUrls[0]} alt={property.title} />
               <div className="property-info">
+                <div style={{ fontWeight: 'bold', color: '#888', fontSize: '0.95em', marginBottom: 4 }}>
+                  ID: {property.propertyId}
+                </div>
                 <h4>{property.title}</h4>
                 <p>₹{property.price.toLocaleString()}</p>
                 <p>{property.location}</p>
