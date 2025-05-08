@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import './AdminDashboard.css';
+import './AdminDashboard.css'; // Make sure this CSS file is correctly styled
 
 function AdminDashboard() {
   const [properties, setProperties] = useState([]);
@@ -10,13 +10,15 @@ function AdminDashboard() {
     description: '',
     price: '',
     location: '',
-    area: '',
+    area: '', // Will store the numerical value for input
+    areaUnit: 'sqft', // Default unit
     facing: '',
     imageUrls: [],
     features: []
   });
   const [feature, setFeature] = useState('');
   const [editingId, setEditingId] = useState(null);
+  const [formError, setFormError] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -36,22 +38,21 @@ function AdminDashboard() {
       setProperties(response.data);
     } catch (error) {
       console.error('Error fetching properties:', error);
+      if (error.response && error.response.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/admin/login');
+      } else {
+        setFormError('Could not fetch properties. Please try again later.');
+      }
     }
   };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    if (name === 'imageUrls') {
-      setNewProperty({
-        ...newProperty,
-        imageUrls: value.split(',').map(url => url.trim()).filter(Boolean)
-      });
-    } else {
-      setNewProperty({
-        ...newProperty,
-        [name]: value
-      });
-    }
+    setNewProperty({
+      ...newProperty,
+      [name]: value
+    });
   };
 
   const handleFeatureAdd = () => {
@@ -73,36 +74,92 @@ function AdminDashboard() {
 
   const handleEdit = (property) => {
     setNewProperty({
-      title: property.title,
-      description: property.description,
-      price: property.price,
-      location: property.location,
-      area: property.area,
-      facing: property.facing,
-      imageUrls: property.imageUrls,
-      features: property.features
+      title: property.title || '',
+      description: property.description || '',
+      price: property.price !== undefined ? String(property.price) : '',
+      location: property.location || '',
+      area: property.area !== undefined && property.area !== null ? String(property.area) : '',
+      areaUnit: property.areaUnit || 'sqft',
+      facing: property.facing || '',
+      imageUrls: property.imageUrls || [],
+      features: property.features || []
     });
     setEditingId(property._id);
+    setFormError(''); // Clear previous form errors
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setFormError('');
+
+    // Client-side validation
+    if (!newProperty.title.trim() || !newProperty.description.trim() || newProperty.price.trim() === '' || !newProperty.location.trim() || !newProperty.facing.trim()) {
+        setFormError('Please fill all required fields: Title, Description, Price, Location, Facing.');
+        return;
+    }
+    if (newProperty.imageUrls.some(url => !url.trim())) {
+        setFormError('All image URLs must be filled if added. Remove empty URL fields or provide a valid URL.');
+        return;
+    }
+    
+
+    const priceValue = parseFloat(newProperty.price);
+    if (isNaN(priceValue) || priceValue < 0) {
+      setFormError('Price must be a valid non-negative number.');
+      return;
+    }
+
+    let areaValue;
+    let areaUnitValue = newProperty.areaUnit;
+
+    if (newProperty.area.trim() !== '') {
+        areaValue = parseFloat(newProperty.area);
+        if (isNaN(areaValue) || areaValue < 0) {
+            setFormError('Area must be a valid non-negative number if provided.');
+            return;
+        }
+        if (!areaUnitValue) { // Should not happen if dropdown is used correctly
+            setFormError('Area unit is required if area value is provided.');
+            return;
+        }
+    } else {
+        areaValue = undefined; // Send undefined if area is empty, backend will handle optional nature
+        areaUnitValue = undefined; // Don't send unit if no area value
+    }
+
+    const payload = {
+      ...newProperty,
+      price: priceValue,
+      area: areaValue,
+      areaUnit: areaUnitValue,
+      features: Array.isArray(newProperty.features) ? newProperty.features : [],
+      imageUrls: Array.isArray(newProperty.imageUrls) ? newProperty.imageUrls.filter(url => url.trim() !== '') : [],
+    };
+
+    // Clean up payload: remove area and areaUnit if areaValue is undefined
+    if (payload.area === undefined) {
+        delete payload.area;
+        delete payload.areaUnit;
+    }
+
+
     try {
       if (editingId) {
-        await axios.put(`/api/properties/${editingId}`, newProperty, {
+        await axios.put(`/api/properties/${editingId}`, payload, {
           headers: { 'x-auth-token': localStorage.getItem('token') }
         });
       } else {
-        await axios.post('/api/properties', newProperty, {
+        await axios.post('/api/properties', payload, {
           headers: { 'x-auth-token': localStorage.getItem('token') }
         });
       }
-      setNewProperty({
+      setNewProperty({ // Reset form
         title: '',
         description: '',
         price: '',
         location: '',
         area: '',
+        areaUnit: 'sqft', // Reset to default unit
         facing: '',
         imageUrls: [],
         features: []
@@ -111,10 +168,31 @@ function AdminDashboard() {
       fetchProperties();
     } catch (error) {
       console.error('Error adding/updating property:', error);
+      if (error.response) {
+        console.error('Backend Error Status:', error.response.status);
+        console.error('Backend Error Data:', error.response.data);
+        const backendErrorMessage = typeof error.response.data === 'string' ? error.response.data :
+                                    (error.response.data && (error.response.data.message || error.response.data.error)) ? (error.response.data.message || error.response.data.error) :
+                                    'An error occurred. Please check details and try again.';
+        setFormError(`Server Error: ${backendErrorMessage}`);
+        if (error.response.status === 401) {
+            localStorage.removeItem('token');
+            navigate('/admin/login');
+        }
+      } else if (error.request) {
+        console.error('No response from server:', error.request);
+        setFormError('Could not connect to the server. Please check your network connection.');
+      } else {
+        console.error('Error setting up request:', error.message);
+        setFormError(`Request Error: ${error.message}`);
+      }
     }
   };
 
   const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this property?')) {
+        return;
+    }
     try {
       await axios.delete(`/api/properties/${id}`, {
         headers: { 'x-auth-token': localStorage.getItem('token') }
@@ -122,6 +200,12 @@ function AdminDashboard() {
       fetchProperties();
     } catch (error) {
       console.error('Error deleting property:', error);
+      if (error.response && error.response.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/admin/login');
+      } else {
+        setFormError('Failed to delete property. Please try again.');
+      }
     }
   };
 
@@ -149,16 +233,29 @@ function AdminDashboard() {
     });
   };
 
+  const formatAreaDisplay = (area, unit) => {
+    if (area === undefined || area === null || area === '') return 'N/A';
+    let unitDisplay = 'sqft'; // Default display string if unit is missing but area exists
+    if (unit === 'sqft') unitDisplay = 'sq ft';
+    else if (unit === 'sqyd') unitDisplay = 'sq yds';
+    else if (unit === 'sqmt') unitDisplay = 'sq m';
+    else if (unit === 'acre') unitDisplay = 'acres';
+    // Add more units display logic here if needed based on your backend enum
+    return `${area} ${unitDisplay}`;
+  };
+
   return (
     <div className="admin-dashboard">
       <h2>Admin Dashboard</h2>
       
       <div className="add-property-section">
-        <h3>Add New Property</h3>
+        <h3>{editingId ? 'Edit Property' : 'Add New Property'}</h3>
+        {formError && <div className="form-error-message">{formError}</div>}
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label>Title</label>
+            <label htmlFor="title">Title</label>
             <input
+              id="title"
               type="text"
               name="title"
               value={newProperty.title}
@@ -167,8 +264,9 @@ function AdminDashboard() {
             />
           </div>
           <div className="form-group">
-            <label>Description</label>
+            <label htmlFor="description">Description</label>
             <textarea
+              id="description"
               name="description"
               value={newProperty.description}
               onChange={handleInputChange}
@@ -176,18 +274,22 @@ function AdminDashboard() {
             />
           </div>
           <div className="form-group">
-            <label>Price</label>
+            <label htmlFor="price">Price (₹)</label>
             <input
+              id="price"
               type="number"
               name="price"
               value={newProperty.price}
               onChange={handleInputChange}
+              placeholder="Enter price"
               required
+              min="0"
             />
           </div>
           <div className="form-group">
-            <label>Location</label>
+            <label htmlFor="location">Location</label>
             <input
+              id="location"
               type="text"
               name="location"
               value={newProperty.location}
@@ -195,19 +297,39 @@ function AdminDashboard() {
               required
             />
           </div>
+          
           <div className="form-group">
-            <label>Area (sq yd)</label>
-            <input
-              type="number"
-              name="area"
-              value={newProperty.area}
-              onChange={handleInputChange}
-            
-            />
+            <label>Area</label>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <input
+                type="number"
+                name="area"
+                value={newProperty.area}
+                onChange={handleInputChange}
+                placeholder="e.g., 1200"
+                style={{ flex: 2 }}
+                min="0"
+              />
+              <select
+                name="areaUnit"
+                value={newProperty.areaUnit}
+                onChange={handleInputChange}
+                style={{ flex: 1 }}
+                // required={!!newProperty.area.trim()} // Unit required if area is filled
+              >
+                <option value="sqft">sq ft</option>
+                <option value="sqyd">sq yds</option>
+                <option value="sqmt">sq m</option>
+                <option value="acre">acres</option>
+                {/* Add more units based on your backend Property model enum */}
+              </select>
+            </div>
           </div>
+
           <div className="form-group">
-            <label>Facing</label>
+            <label htmlFor="facing">Facing</label>
             <select
+              id="facing"
               name="facing"
               value={newProperty.facing}
               onChange={handleInputChange}
@@ -225,36 +347,37 @@ function AdminDashboard() {
             </select>
           </div>
           <div className="form-group">
-            <label>Image URLs</label>
+            <label>Image URLs (at least one required)</label>
             {newProperty.imageUrls.map((url, idx) => (
-              <div key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+              <div key={idx} className="image-url-input">
                 <input
                   type="url"
                   value={url}
                   onChange={e => handleImageUrlChange(idx, e.target.value)}
-                  placeholder={`Image URL #${idx + 1}`}
-                  required
-                  style={{ flex: 1, marginRight: 8, minWidth: 0 }}
+                  placeholder={`Image URL #${idx + 1}`} 
                 />
-                <button type="button" onClick={() => handleRemoveImageUrl(idx)} style={{ background: '#dc3545', color: 'white', border: 'none', borderRadius: 4, padding: '6px 12px', cursor: 'pointer', minWidth: 'auto', width: 'auto' }}>Remove</button>
+                <button type="button" onClick={() => handleRemoveImageUrl(idx)} className="remove-image-url-button">Remove</button>
               </div>
             ))}
-            <button type="button" onClick={handleAddImageUrl} style={{ background: '#007bff', color: 'white', border: 'none', borderRadius: 4, padding: '8px 16px', cursor: 'pointer', marginTop: 8, width: 'auto', minWidth: 'auto' }}>
-              Add URL
+            <button type="button" onClick={handleAddImageUrl} className="add-image-url-button">
+              Add Image URL
             </button>
           </div>
-          <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <label style={{ flex: '0 0 80px' }}>Features</label>
-            <input
-              type="text"
-              value={feature}
-              onChange={(e) => setFeature(e.target.value)}
-              placeholder="Add a feature"
-              style={{ flex: 1, minWidth: 0 }}
-            />
-            <button type="button" onClick={handleFeatureAdd} style={{ background: '#28a745', color: 'white', border: 'none', borderRadius: 4, padding: '8px 16px', cursor: 'pointer', width: 'auto', minWidth: 'auto' }}>
-              Add
-            </button>
+          <div className="form-group feature-input-container">
+            <label htmlFor="feature-text">Features</label>
+            <div className="feature-input">
+                <input
+                  id="feature-text"
+                  type="text"
+                  value={feature}
+                  onChange={(e) => setFeature(e.target.value)}
+                  placeholder="Add a feature (e.g., Parking, Garden)"
+                />
+                <button type="button" onClick={handleFeatureAdd}
+                 className="button-inline"> 
+                  Add
+                </button>
+            </div>
           </div>
           <div className="features-list">
             {newProperty.features.map((f, index) => (
@@ -264,6 +387,7 @@ function AdminDashboard() {
                   type="button"
                   onClick={() => handleFeatureRemove(index)}
                   className="remove-feature"
+                  aria-label={`Remove feature ${f}`}
                 >
                   ×
                 </button>
@@ -279,27 +403,32 @@ function AdminDashboard() {
         <div className="properties-grid">
           {properties.map((property) => (
             <div key={property._id} className="property-card">
-              <img src={property.imageUrls[0]} alt={property.title} />
+              <img 
+                src={property.imageUrls && property.imageUrls.length > 0 ? property.imageUrls[0] : 'https://via.placeholder.com/250x150.png?text=No+Image'} 
+                alt={property.title || 'Property Image'}
+                onError={(e) => { e.target.onerror = null; e.target.src='https://via.placeholder.com/250x150.png?text=Invalid+Image'; }}
+              />
               <div className="property-info">
-                <div style={{ fontWeight: 'bold', color: '#888', fontSize: '0.95em', marginBottom: 4 }}>
-                  ID: {property.propertyId}
-                </div>
+                {property.propertyId && 
+                    <div className="property-id-display">
+                      ID: {property.propertyId}
+                    </div>
+                }
                 <h4>{property.title}</h4>
-                <p>₹{property.price.toLocaleString()}</p>
+                <p>₹{property.price ? property.price.toLocaleString() : 'N/A'}</p>
                 <p>{property.location}</p>
-                <p>Area: {property.area} sq yd | Facing: {property.facing}</p>
+                <p>Area: {formatAreaDisplay(property.area, property.areaUnit)} | Facing: {property.facing}</p>
+                <button
+                  onClick={() => handleEdit(property)}
+                  className="edit-button"
+                >
+                  Edit
+                </button>
                 <button
                   onClick={() => handleDelete(property._id)}
                   className="delete-button"
                 >
                   Delete
-                </button>
-                <button
-                  onClick={() => handleEdit(property)}
-                  className="edit-button"
-                  style={{ marginTop: '10px', backgroundColor: '#ffc107', color: '#333' }}
-                >
-                  Edit
                 </button>
               </div>
             </div>
@@ -310,4 +439,4 @@ function AdminDashboard() {
   );
 }
 
-export default AdminDashboard; 
+export default AdminDashboard;

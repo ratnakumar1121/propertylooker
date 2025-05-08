@@ -20,7 +20,13 @@ const PropertySchema = new mongoose.Schema({
     },
     area: {
         type: Number,
-        required: true
+        required: false
+    },
+    areaUnit: { // Stores the unit for the area
+        type: String,
+        required: function() { return this.area != null && this.area !== undefined; }, // Required only if area is provided
+        enum: ['sqft', 'sqyd', 'sqmt', 'acre'], // Define your allowed units
+        default: 'sqft' // Optional: set a default unit
     },
     facing: {
         type: String,
@@ -29,7 +35,7 @@ const PropertySchema = new mongoose.Schema({
     },
     imageUrls: [{
         type: String,
-        required: true
+        required: false
     }],
     features: [{
         type: String
