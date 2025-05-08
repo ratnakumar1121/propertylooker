@@ -95,7 +95,7 @@ function Home() {
           <input
             type="number"
             name="area"
-            placeholder="Max Area (sq ft)"
+            placeholder="Max Area (sq yd)"
             value={searchParams.area}
             onChange={handleInputChange}
           />
