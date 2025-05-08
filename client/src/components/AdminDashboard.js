@@ -202,7 +202,7 @@ function AdminDashboard() {
               name="area"
               value={newProperty.area}
               onChange={handleInputChange}
-              required
+            
             />
           </div>
           <div className="form-group">
